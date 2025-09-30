@@ -1,0 +1,9 @@
+These are instructions and context for the frontend of the Farm Monitoring platform. For the backend, look elsewhere.
+
+THESE ARE INSTRUCTIONS FOR A FRIENDLY AI TO HELP BUILD THE APP:
+
+Universal Styling with MUI: The React Component Library to use for all React components is Material UI (mui). To ensure you mui throughout the frontend to create a consistent look, make sure to reference the file /llm_context/mui_context.txt , where there are helpful tips (don't be afraid to search the web) and to consult `mui-mcp` to follow the theme.
+
+Frontend Design Instructions: When the app loads, the first view will be two primary components, the SideNav and the MapCanvas. The SideNav is a rectangular button with rounded corners that occupies the upper-left corner of the screen. It reacts slightly on hover by changing tone. On click, it opens a rectangular dropdown that is the same width as the rectangle but continues to the bottom of the screen. Add 3 placeholder buttons that don't do anything for now in the dropdown.
+
+The other component, MapCanvas, implements the leaflet map and is centered on the GPS coordinates 44°50′24″N 122°46′22″W. Review frontend_layout.png for visual details.

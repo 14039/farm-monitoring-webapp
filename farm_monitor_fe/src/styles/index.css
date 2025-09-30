@@ -1,0 +1,5 @@
+html, body, #root { width: 100%; height: 100%; margin: 0; padding: 0; }
+.leaflet-container { width: 100%; height: 100%; }
+/* Hide default Leaflet zoom control (we use pinch/scroll to zoom) */
+.leaflet-control-zoom { display: none !important; }
+
