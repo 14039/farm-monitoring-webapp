@@ -1,0 +1,36 @@
+Frontend initialized with Vite + React + TS inside `farm_monitor_fe`.
+Added MUI v6 for UI and Leaflet for maps. App shell renders two components per design: `SideNav` (rounded button top-left that toggles a dropdown with three placeholder actions) and `MapCanvas` (Leaflet map centered at 44°50′24″N, 122°46′22″W). Global CSS ensures full-viewport sizing and Leaflet container fills parent. Theme uses default `createTheme()` for now.
+Run: `cd farm_monitor_fe && pnpm install && pnpm dev` (or npm/yarn equivalents).
+
+Component details:
+- `SideNav`: Top-left primary `Button` labeled “Sublime Organics” with logo (from `/public/logo.avif`) shown via `startIcon`. Button width is responsive: `{ xs: 70vw, sm: 40vw, md: 24vw, lg: 20vw }`. Clicking toggles a dropdown (`Paper`) with three placeholder buttons. Dropdown height `calc(100vh - 88px)`.
+- `MapCanvas`: `react-leaflet` `MapContainer` + OSM `TileLayer`; map fills parent; center derived from DMS to decimal conversion.
+- `MapCanvas`: switched to satellite imagery using Google tiles (`lyrs=s`, subdomains mt0-3, maxZoom 20). Map fills parent; center derived from DMS to decimal conversion.
+- Logo: placed at `public/logo.avif` (copied from user-supplied `PNGSublimeLogoHighQuality.avif`). Referenced by SideNav via `/logo.avif`.
+- Global CSS: `html, body, #root` 100% w/h; `.leaflet-container` 100% w/h.
+Map UX:
+- Leaflet zoom control hidden (`zoomControl={false}` on `MapContainer` plus CSS `.leaflet-control-zoom { display:none }`). Zoom via pinch/scroll only. Default zoom increased to 17 for closer satellite view.
+
+Backend scaffolding (temporary mock DB via JSON):
+- Added FastAPI server in `backend/server.py` with CORS for Vite dev origin.
+- Endpoint implemented: `GET /api/sensors` reading from `backend/data/sensors.json`.
+- JSON schema mirrors `sensor` table fields: `hardware_id`, `name`, `sensor_type`, `gps_latitude`, `gps_longitude`, `metadata`.
+- Clear comments marked "REPLACE WITH REAL DB CALL" indicate where to swap JSON-loading with real DB queries later.
+- Python deps listed in `backend/requirements.txt` (fastapi, uvicorn, pydantic).
+
+Frontend integration:
+- `MapCanvas.tsx` fetches sensors from backend only (no local fallback), on mount.
+- Base URL configurable via `VITE_API_BASE_URL` (defaults to `http://127.0.0.1:8000`).
+- Sensors rendered as `CircleMarker` with popup showing name/type/id.
+
+Run instructions:
+1) Backend
+   - `cd backend`
+   - `python -m venv .venv && source .venv/bin/activate`
+   - `pip install -r requirements.txt`
+   - `uvicorn server:app --reload --port 8000`
+2) Frontend
+   - `cd farm_monitor_fe`
+   - `npm install`
+   - `VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev`
+

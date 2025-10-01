@@ -1,0 +1,29 @@
+[
+  {
+    "hardware_id": 101,
+    "name": "Barn Temp",
+    "sensor_type": "temperature",
+    "gps_latitude": 44.84015,
+    "gps_longitude": -122.7726,
+    "metadata": { "notes": "Near barn" }
+  },
+  {
+    "hardware_id": 102,
+    "name": "Field Moisture A",
+    "sensor_type": "soil",
+    "gps_latitude": 44.8399,
+    "gps_longitude": -122.7731,
+    "metadata": { "notes": "North field" }
+  },
+  {
+    "hardware_id": 103,
+    "name": "Gate Camera",
+    "sensor_type": "camera",
+    "gps_latitude": 44.84035,
+    "gps_longitude": -122.7722,
+    "metadata": { "notes": "Main gate" }
+  }
+]
+
+
+

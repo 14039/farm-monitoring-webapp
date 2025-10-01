@@ -1,0 +1,202 @@
+These are instructions and context for the Farm Monitoring platform. 
+
+THESE ARE INSTRUCTIONS FOR A FRIENDLY AI TO HELP BUILD THE APP:
+
+High-Level Architecture: The project uses an AWS-hosted server to store sensor data from a farm. There are multiple wireless sensors deployed on a physical farm, ranging from cameras to temperature sensors to soil-moisture sensors, each collecting and broadcasting data to the hosted database. This software project is a UI to visualize that data.
+
+Frontend Universal Styling with MUI: The React Component Library to use for all React components is Material UI (mui). To ensure you mui throughout the frontend to create a consistent look, make sure to reference the file /llm_context/mui_context.txt , where there are helpful tips (don't be afraid to search the web) and to consult `mui-mcp` to follow the theme.
+
+Frontend Design Instructions: When the app loads, the first view will be two primary components, the SideNav and the MapCanvas. The SideNav is a rectangular button with rounded corners that occupies the upper-left corner of the screen. It reacts slightly on hover by changing tone. On click, it opens a rectangular dropdown that is the same width as the rectangle but continues to the bottom of the screen. Add 3 placeholder buttons that don't do anything for now in the dropdown.
+
+The other component, MapCanvas, implements the leaflet map and is centered on the GPS coordinates 44°50′24″N 122°46′22″W. Review frontend_layout.png for visual details.
+
+Backend Design Instructions: For now, the hosted database isn't set up, but you can see it's approximate structure by checking out the /llm_context/database_structure.txt file. The backend will be a single Python file whose main function is to retrieve information from the AWS hosted database and S3 bucket (in the case of images) for the frontend to display for visualisation. There are a few requirements for the backend:
+ - Function(s) that retrieve information about every sensor on the farm. When the app loads, this function will retrieve information like the name, sensor_type and GPS coordinates of each sensor, allowing the frontend to populate the map-based UI with an icon for each sensor present. 
+ - Function(s) the retrieve information about a specific sensor. When the user clicks into a specific sensor using the map-UI, we will want to display the actual readings of that sensor (temperature / humidity datapoints, images taken every ~1hr, or soil moisture values over time), and so on request, the backend should retrieve the specific information about that sensor to display. This functionality should implement long-polling, periodically checking the databases "reading" table to retrieve new readings if they show up (IE, if the user is viewing specific sensor data, like temperature data at a certain location on their farm, and that sensor broadcasts a new, timely temperature reading, long-polling will be periodically checking for such a reading, so that ultimately it can be made available "live" to the viewer). More information on long polling can be found at the bottom of this document.
+
+
+
+
+
+
+
+Additional Information about Long Polling:
+Long polling will be used in the project to ensure timely updates to the UI when new sensor data is available. Read this article (transcription below) to understand. The TLDR is approximately:
+Frontend code:
+<DataView>
+
+const [state, setState] = useState([]);
+
+useEffect(() => {
+    while (1) {
+        time.sleep(30) // in seconds
+        const ata = await get-my-data();
+        setState([...state, ...data])
+    }
+}, [])
+
+</DataView>
+
+Backend code:
+// GET my-data
+def get_data():
+    ..
+    ..
+    return [{...}, {...}, {...}]
+
+https://medium.com/@ignatovich.dm/implementing-long-polling-with-express-and-react-2cb965203128
+
+Implementing Long Polling with Express and React
+
+Long polling is a web technique used to maintain a persistent connection between the client and server, enabling the server to send data to the client as soon as it’s available. Unlike WebSockets, which provide a full-duplex communication channel, long polling works over HTTP, making it a good alternative when WebSockets are not an option.
+
+
+What is Long Polling?
+Long polling is an HTTP-based technique where the client repeatedly requests data from the server. The server holds the request open until there is new information available, at which point it sends the data back to the client. Once the client receives the data, it immediately sends a new request, maintaining the connection.
+
+Here’s how long polling works:
+
+The client sends an HTTP request to the server.
+The server holds the request until it has new data or a timeout occurs.
+Once data is available, the server responds to the client.
+The client immediately sends another request to continue polling.
+Setting Up the Backend with Express
+We’ll start by setting up a simple Express server that simulates sending new data to the client after a delay. Here’s how we can implement long polling on the server side.
+
+1. Install Dependencies
+First, make sure you have Node.js installed. Then, create a new folder for your project and install Express:
+
+mkdir express-long-polling
+cd express-long-polling
+npm init -y
+npm install express cors
+We’ll also install cors to allow cross-origin requests from our React frontend.
+
+2. Create the Express Server
+Now, let’s create a simple Express server in server.js:
+
+const express = require('express');
+const cors = require('cors');
+
+const app = express();
+const port = 5000;
+
+// Use CORS to allow requests from the frontend
+app.use(cors());
+
+// Simulate data that changes over time
+let latestData = { message: "Initial message" };
+
+// Endpoint for long polling
+app.get('/poll', (req, res) => {
+  console.log('Client connected, waiting for new data...');
+
+  // Function to simulate data changes
+  function checkForNewData() {
+    const randomNum = Math.random();
+    
+    // Simulate condition to send new data (for example, a 50% chance of new data)
+    if (randomNum > 0.5) {
+      latestData = { message: `New data received at ${new Date().toLocaleTimeString()}` };
+      res.json(latestData);
+    } else {
+      // If no new data, continue polling after a short delay
+      setTimeout(checkForNewData, 2000);  // Check again after 2 seconds
+    }
+  }
+
+  // Start checking for new data
+  checkForNewData();
+});
+
+// Start server
+app.listen(port, () => {
+  console.log(`Server listening on http://localhost:${port}`);
+});
+In this code:
+
+We create an Express server with a /poll endpoint.
+The server holds the request open and checks every 2 seconds if there is new data.
+If new data becomes available, it sends the data back to the client.
+Setting Up the Frontend with React
+Now that we have our backend set up, let’s create a simple React application that performs long polling to retrieve the data.
+
+1. Create the React App
+In a separate directory, create a new React app:
+
+npx create-react-app react-long-polling
+cd react-long-polling
+npm install axios
+We’ll use axios to handle HTTP requests.
+
+2. Implement Long Polling in React
+Here’s how we can implement long polling in App.js:
+
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+function App() {
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    // Function to start polling
+    const startPolling = () => {
+      axios.get('http://localhost:5000/poll')
+        .then(response => {
+          if (isMounted) {
+            setData(response.data);
+            console.log("Data received:", response.data);
+            startPolling();  // Continue polling after receiving data
+          }
+        })
+        .catch(error => {
+          console.error('Error while polling:', error);
+          if (isMounted) {
+            setTimeout(startPolling, 2000);  // Retry after a delay on error
+          }
+        });
+    };
+
+    // Start the long polling when the component mounts
+    startPolling();
+
+    // Cleanup on component unmount
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return (
+    <div className="App">
+      <h1>Long Polling with Express and React</h1>
+      <div>
+        {data ? <p>{data.message}</p> : <p>Waiting for new data...</p>}
+      </div>
+    </div>
+  );
+}
+
+export default App;
+In this code:
+
+useEffect is used to initiate the polling when the component mounts.
+The axios.get call sends a request to the /poll endpoint of the Express server.
+When new data is received, we update the state with setData and call startPolling again to continue the process.
+If there’s an error (e.g., the server is down), we retry after a delay of 2 seconds.
+How Long Polling Works Here
+The React app sends an HTTP request to the Express server.
+The Express server holds the request open, waiting for new data to become available (in this case, we simulate new data using random logic).
+Once the server has new data, it responds to the client.
+The React app receives the data and immediately sends another request to continue polling.
+This creates a near real-time experience without requiring WebSockets.
+
+Why Use Long Polling?
+Long polling is useful when:
+
+WebSockets are not an option: If your infrastructure doesn’t support WebSockets or you’re working with environments where WebSockets can be blocked (e.g., corporate firewalls).
+Low-frequency updates: If real-time data is not crucial but you still need relatively fresh updates.
+Compatibility: Long polling works over HTTP, so it’s compatible with environments where WebSockets may be too complex or unnecessary.
+Conclusion
+Long polling is a simple yet effective technique for achieving near real-time communication between a server and client without the complexity of WebSockets. In this article, we showed how to implement long polling using Express and React. This method keeps the connection open until the server has new data to send, allowing your React app to display fresh content as soon as it becomes available.
