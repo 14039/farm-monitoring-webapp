@@ -10,9 +10,20 @@ Frontend Design Instructions: When the app loads, the first view will be two pri
 
 The other component, MapCanvas, implements the leaflet map and is centered on the GPS coordinates 44°50′24″N 122°46′22″W. Review frontend_layout.png for visual details.
 
-Backend Design Instructions: For now, the hosted database isn't set up, but you can see it's approximate structure by checking out the /llm_context/database_structure.txt file. The backend will be a single Python file whose main function is to retrieve information from the AWS hosted database and S3 bucket (in the case of images) for the frontend to display for visualisation. There are a few requirements for the backend:
- - Function(s) that retrieve information about every sensor on the farm. When the app loads, this function will retrieve information like the name, sensor_type and GPS coordinates of each sensor, allowing the frontend to populate the map-based UI with an icon for each sensor present. 
- - Function(s) the retrieve information about a specific sensor. When the user clicks into a specific sensor using the map-UI, we will want to display the actual readings of that sensor (temperature / humidity datapoints, images taken every ~1hr, or soil moisture values over time), and so on request, the backend should retrieve the specific information about that sensor to display. This functionality should implement long-polling, periodically checking the databases "reading" table to retrieve new readings if they show up (IE, if the user is viewing specific sensor data, like temperature data at a certain location on their farm, and that sensor broadcasts a new, timely temperature reading, long-polling will be periodically checking for such a reading, so that ultimately it can be made available "live" to the viewer). More information on long polling can be found at the bottom of this document.
+Backend Design Instructions (updated): The database schema is defined in `/schema.sql` (psql-friendly, idempotent). The backend lives in `/backend/server.py` and reads from PostgreSQL via a small `psycopg_pool.ConnectionPool`. Images/S3 integration will be added later. There are a few requirements for the backend:
+ - [IMPLEMENTED] Function(s) that retrieve information about every sensor on the farm. On app load, `GET /api/sensors` returns `hardware_id, name, sensor_type, gps_latitude, gps_longitude, metadata` from the `sensor` table.
+ - [TODO — FRONTEND MODALS EXIST] Function(s) that retrieve information about a specific sensor. When a user clicks a sensor in the map UI, the backend should return its readings (temperature/humidity, images, soil capacitance, etc.). This endpoint should eventually use long-polling to periodically check the `reading` table for new data while the user is viewing a sensor. See the long-polling notes at the bottom for conceptual guidance.
+
+Local development quick start:
+1) Create schema (ensure local Postgres env or `DATABASE_URL` is set):
+   - `psql -f schema.sql`
+2) Ingest sample data (CSV provided):
+   - `export DATABASE_URL='postgresql://postgres:<pw>@127.0.0.1:8122/postgres'`
+   - `python backend/db_ingest_data.py --csv llm_context/data_log_sample.csv`
+3) Start backend API (adjust port if 8000 is busy):
+   - `uvicorn backend.server:app --reload --port 8001`
+4) Start frontend (point to API port via Vite env):
+   - `cd frontend && VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev`
 
 
 

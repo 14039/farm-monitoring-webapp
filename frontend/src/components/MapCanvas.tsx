@@ -5,7 +5,6 @@ import L from 'leaflet'
 import CameraModal from './CameraModal'
 import SoilSensorModal from './SoilSensorModal'
 import TemperatureModal from './TemperatureModal'
-import LocationPinIcon from '@mui/icons-material/LocationOn'
 import ReactDOMServer from 'react-dom/server'
 
 
@@ -26,6 +25,7 @@ export default function MapCanvas() {
   const [openCamera, setOpenCamera] = useState(false)
   const [openSoil, setOpenSoil] = useState(false)
   const [openTemp, setOpenTemp] = useState(false)
+  const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number]>(FARM_CENTER)
   const [mapKey, setMapKey] = useState(0)
 
@@ -65,15 +65,27 @@ export default function MapCanvas() {
             setMapCenter([sensor.gps_latitude, sensor.gps_longitude])
             setMapKey((k) => k + 1)
             const type = sensor.sensor_type
-            if (type === 'camera') setOpenCamera(true)
-            else if (type === 'soil') setOpenSoil(true)
-            else setOpenTemp(true)
+            if (type === 'camera') {
+              setOpenCamera(true)
+            } else if (type === 'soil') {
+              setOpenSoil(true)
+            } else {
+              setSelectedSensor(sensor)
+              setOpenTemp(true)
+            }
           }} />
         ))}
       </MapContainer>
       <CameraModal open={openCamera} onClose={() => setOpenCamera(false)} />
       <SoilSensorModal open={openSoil} onClose={() => setOpenSoil(false)} />
-      <TemperatureModal open={openTemp} onClose={() => setOpenTemp(false)} />
+      <TemperatureModal
+        open={openTemp}
+        sensor={selectedSensor}
+        onClose={() => {
+          setOpenTemp(false)
+          setSelectedSensor(null)
+        }}
+      />
       {error && (
         <div style={{
           position: 'absolute', bottom: 12, left: 12, padding: '8px 12px',
@@ -90,8 +102,15 @@ function PinMarker({ sensor, onClick }: { sensor: Sensor, onClick?: (s: Sensor) 
   const iconUrl = getIconForSensor(sensor.sensor_type)
   const html = ReactDOMServer.renderToString(
     <div style={{ position: 'relative', width: 64, height: 80 }}>
-      <LocationPinIcon style={{ width: 64, height: 80, color: '#1976d2', filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))' }} />
-      <img src={iconUrl} alt={sensor.sensor_type} style={{ position: 'absolute', left: '50%', top: '30%', width: 28, height: 28, transform: 'translate(-50%, -50%)' }} />
+      {/* Inline SVG (Material "LocationOn" style) with hardcoded fill */}
+      <svg viewBox="0 0 24 24" width={64} height={80} style={{ filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.35))' }}>
+        <path
+          // Teardrop shape
+          d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 11.5c-1.93 0-3.5-1.57-3.5-3.5S10.07 6.5 12 6.5s3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"
+          fill="#1976d2"
+        />
+      </svg>
+      <img src={iconUrl} alt={sensor.sensor_type} style={{ position: 'absolute', left: '50%', top: '40%', width: 56, height: 56, transform: 'translate(-50%, -50%)' }} />
     </div>
   )
   const icon = L.divIcon({ className: '', html, iconSize: [64, 80], iconAnchor: [32, 80] })

@@ -11,26 +11,62 @@ Component details:
 Map UX:
 - Leaflet zoom control hidden (`zoomControl={false}` on `MapContainer` plus CSS `.leaflet-control-zoom { display:none }`). Zoom via pinch/scroll only. Default zoom increased to 17 for closer satellite view.
 
-Backend scaffolding (temporary mock DB via JSON):
-- Added FastAPI server in `backend/server.py` with CORS for Vite dev origin.
-- Endpoint implemented: `GET /api/sensors` reading from `backend/data/sensors.json`.
-- JSON schema mirrors `sensor` table fields: `hardware_id`, `name`, `sensor_type`, `gps_latitude`, `gps_longitude`, `metadata`.
-- Clear comments marked "REPLACE WITH REAL DB CALL" indicate where to swap JSON-loading with real DB queries later.
-- Python deps listed in `backend/requirements.txt` (fastapi, uvicorn, pydantic).
+Backend API (Postgres-backed):
+- FastAPI server in `backend/server.py` with CORS for Vite dev origin.
+- `GET /api/sensors` queries Postgres (no JSON fallback). Data model matches `sensor` table.
+- Python deps listed in `backend/requirements.txt` (fastapi, uvicorn, psycopg, psycopg-pool).
 
 Frontend integration:
 - `MapCanvas.tsx` fetches sensors from backend only (no local fallback), on mount.
 - Base URL configurable via `VITE_API_BASE_URL` (defaults to `http://127.0.0.1:8000`).
 - Sensors rendered as `CircleMarker` with popup showing name/type/id.
 
-Run instructions:
+Run instructions (quick):
 1) Backend
    - `cd backend`
    - `python -m venv .venv && source .venv/bin/activate`
    - `pip install -r requirements.txt`
-   - `uvicorn server:app --reload --port 8000`
+   - `uvicorn backend.server:app --reload --port 8001`
 2) Frontend
-   - `cd farm_monitor_fe`
+   - `cd frontend`
    - `npm install`
-   - `VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev`
+   - `VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev`
 
+
+Database and backend integration (updated):
+- Schema is consolidated into a single root file `schema.sql` (psql-friendly and idempotent).
+  - Usage: `psql "$DATABASE_URL" -f schema.sql`
+  - Includes: `\set ON_ERROR_STOP on`, `set timezone to 'UTC'`, `create extension if not exists pgcrypto`.
+  - Tables: `sensor(hardware_id, name, sensor_type, gps_latitude, gps_longitude, metadata)` and `reading(...)`.
+  - Indexes: `idx_reading_sensor_ts_desc` on `(sensor_id, ts desc)`.
+  - `image_asset` table and its index are present but commented out for now.
+
+- Data ingestion: `backend/db_ingest_data.py` imports `llm_context/data_log_sample.csv` into the DB.
+  - Requires `DATABASE_URL` (example: `postgresql://postgres:<pw>@127.0.0.1:8122/postgres`).
+  - Deterministic `hardware_id` via CRC32 of CSV "TX ID"; upserts `sensor` on `hardware_id`.
+  - Inserts `reading` in batches with `on conflict (sensor_id, ts) do nothing`.
+  - CSV-specific fields mapped: `temperature_c`, `humidity_pct`, `battery_v`, `rssi_dbm`; `capacitance_val` is `NULL` for this dataset.
+  - Defaults: `--sensor-type` (default `temperature`), `--default-lat`, `--default-lon` applied per new sensor.
+
+- Backend API now reads from Postgres instead of JSON.
+  - File: `backend/server.py`.
+  - Uses `psycopg_pool.ConnectionPool` with simple FastAPI `startup`/`shutdown` handlers.
+  - Endpoint: `GET /api/sensors` selects `hardware_id, name, sensor_type, gps_latitude, gps_longitude, coalesce(metadata,'{}'::jsonb)` from `sensor` ordered by `hardware_id`.
+  - CORS allows any localhost port for Vite dev.
+  - Note: `DATABASE_URL` must be set for the API to start.
+
+- Frontend integration with API.
+  - `frontend/src/components/MapCanvas.tsx` fetches from `VITE_API_BASE_URL` or defaults to `http://127.0.0.1:8000`.
+  - If backend runs on a different port (e.g., 8001), set `VITE_API_BASE_URL=http://127.0.0.1:8001` (env or `.env.local`).
+  - CORS on the backend is already configured to accept any localhost port.
+
+- Quick runbook (local):
+  1) Create schema: `psql -f schema.sql` (ensure `PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE` or `DATABASE_URL` are set).
+  2) Ingest data: `export DATABASE_URL='postgresql://postgres:<pw>@127.0.0.1:8122/postgres' && python backend/db_ingest_data.py --csv llm_context/data_log_sample.csv`.
+  3) Start backend: `pip install -r backend/requirements.txt && uvicorn backend.server:app --reload --port 8001` (or 8000 if available).
+  4) Start frontend: `cd frontend && npm install && VITE_API_BASE_URL=http://127.0.0.1:<api_port> npm run dev`.
+
+- Troubleshooting notes:
+  - If `uvicorn` reports "Address already in use", free the port: `lsof -nP -iTCP:8000 -sTCP:LISTEN -t | xargs kill` or change `--port`.
+  - If frontend logs `ERR_CONNECTION_TIMED_OUT` to `127.0.0.1:8000/api/sensors`, verify `VITE_API_BASE_URL` matches the backend port.
+  - The server prints a startup DB connectivity message and the count of sensors fetched on `/api/sensors` for quick verification during development.
