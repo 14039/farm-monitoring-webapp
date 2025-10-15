@@ -113,77 +113,36 @@ class Reading(BaseModel):
 
 
 @app.get("/api/sensors/{sensor_id}/readings", response_model=List[Reading])
-def get_sensor_readings(sensor_id: int, start: Optional[str] = None, end: Optional[str] = None) -> List[Reading]:
+def get_sensor_readings(sensor_id: int, start: str, end: str) -> List[Reading]:
     """
-    Return readings for a specific sensor, ordered by timestamp ascending.
-    Accepts optional ISO8601 `start` and `end` (UTC) bounds.
+    Return readings for a specific sensor between [start, end], ordered by ts asc.
+    Required params: start, end as ISO8601. Example: 2025-09-17T00:53:13Z
     """
     assert pool is not None
 
-    # Parse bounds if provided
-    start_dt: Optional[datetime] = None
-    end_dt: Optional[datetime] = None
     try:
-        if start:
-            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-        if end:
-            end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+        start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
     except Exception:
-        # If parsing fails, ignore bounds to avoid 500s during development
-        start_dt = None
-        end_dt = None
+        raise HTTPException(status_code=400, detail="Invalid start/end ISO8601 timestamps")
+
+    if start_dt > end_dt:
+        raise HTTPException(status_code=400, detail="start must be <= end")
 
     with pool.connection() as conn:
         with conn.cursor() as cur:
             cur.execute("set timezone to 'UTC'")
-            if start_dt and end_dt:
-                cur.execute(
-                    """
-                    select id::text, sensor_id, ts, sequence,
-                           temperature_c, humidity_pct, capacitance_val,
-                           battery_v, rssi_dbm
-                    from reading
-                    where sensor_id = %s and ts >= %s and ts <= %s
-                    order by ts asc
-                    """,
-                    (sensor_id, start_dt, end_dt),
-                )
-            elif start_dt:
-                cur.execute(
-                    """
-                    select id::text, sensor_id, ts, sequence,
-                           temperature_c, humidity_pct, capacitance_val,
-                           battery_v, rssi_dbm
-                    from reading
-                    where sensor_id = %s and ts >= %s
-                    order by ts asc
-                    """,
-                    (sensor_id, start_dt),
-                )
-            elif end_dt:
-                cur.execute(
-                    """
-                    select id::text, sensor_id, ts, sequence,
-                           temperature_c, humidity_pct, capacitance_val,
-                           battery_v, rssi_dbm
-                    from reading
-                    where sensor_id = %s and ts <= %s
-                    order by ts asc
-                    """,
-                    (sensor_id, end_dt),
-                )
-            else:
-                cur.execute(
-                    """
-                    select id::text, sensor_id, ts, sequence,
-                           temperature_c, humidity_pct, capacitance_val,
-                           battery_v, rssi_dbm
-                    from reading
-                    where sensor_id = %s
-                    order by ts asc
-                    """,
-                    (sensor_id,),
-                )
+            cur.execute(
+                """
+                select id::text, sensor_id, ts, sequence,
+                       temperature_c, humidity_pct, capacitance_val,
+                       battery_v, rssi_dbm
+                from reading
+                where sensor_id = %s and ts >= %s and ts <= %s
+                order by ts asc
+                """,
+                (sensor_id, start_dt, end_dt),
+            )
             rows = cur.fetchall()
 
     readings: List[Reading] = []

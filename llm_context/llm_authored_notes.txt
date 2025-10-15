@@ -11,26 +11,28 @@ Component details:
 Map UX:
 - Leaflet zoom control hidden (`zoomControl={false}` on `MapContainer` plus CSS `.leaflet-control-zoom { display:none }`). Zoom via pinch/scroll only. Default zoom increased to 17 for closer satellite view.
 
-Backend API (Postgres-backed):
-- FastAPI server in `backend/server.py` with CORS for Vite dev origin.
-- `GET /api/sensors` queries Postgres (no JSON fallback). Data model matches `sensor` table.
-- Python deps listed in `backend/requirements.txt` (fastapi, uvicorn, psycopg, psycopg-pool).
+Backend scaffolding (temporary mock DB via JSON):
+- Added FastAPI server in `backend/server.py` with CORS for Vite dev origin.
+- Endpoint implemented: `GET /api/sensors` reading from `backend/data/sensors.json`.
+- JSON schema mirrors `sensor` table fields: `hardware_id`, `name`, `sensor_type`, `gps_latitude`, `gps_longitude`, `metadata`.
+- Clear comments marked "REPLACE WITH REAL DB CALL" indicate where to swap JSON-loading with real DB queries later.
+- Python deps listed in `backend/requirements.txt` (fastapi, uvicorn, pydantic).
 
 Frontend integration:
 - `MapCanvas.tsx` fetches sensors from backend only (no local fallback), on mount.
 - Base URL configurable via `VITE_API_BASE_URL` (defaults to `http://127.0.0.1:8000`).
 - Sensors rendered as `CircleMarker` with popup showing name/type/id.
 
-Run instructions (quick):
+Run instructions:
 1) Backend
    - `cd backend`
    - `python -m venv .venv && source .venv/bin/activate`
    - `pip install -r requirements.txt`
-   - `uvicorn backend.server:app --reload --port 8001`
+   - `uvicorn server:app --reload --port 8000`
 2) Frontend
-   - `cd frontend`
+   - `cd farm_monitor_fe`
    - `npm install`
-   - `VITE_API_BASE_URL=http://127.0.0.1:8001 npm run dev`
+   - `VITE_API_BASE_URL=http://127.0.0.1:8000 npm run dev`
 
 
 Database and backend integration (updated):
