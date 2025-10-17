@@ -26,6 +26,7 @@ export default function MapCanvas() {
   const [openSoil, setOpenSoil] = useState(false)
   const [openTemp, setOpenTemp] = useState(false)
   const [selectedSensor, setSelectedSensor] = useState<Sensor | null>(null)
+  const [selectedSoilSensor, setSelectedSoilSensor] = useState<Sensor | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number]>(FARM_CENTER)
   const [mapKey, setMapKey] = useState(0)
 
@@ -68,6 +69,7 @@ export default function MapCanvas() {
             if (type === 'camera') {
               setOpenCamera(true)
             } else if (type === 'soil') {
+              setSelectedSoilSensor(sensor)
               setOpenSoil(true)
             } else {
               setSelectedSensor(sensor)
@@ -77,7 +79,14 @@ export default function MapCanvas() {
         ))}
       </MapContainer>
       <CameraModal open={openCamera} onClose={() => setOpenCamera(false)} />
-      <SoilSensorModal open={openSoil} onClose={() => setOpenSoil(false)} />
+      <SoilSensorModal
+        open={openSoil}
+        sensor={selectedSoilSensor ? { hardware_id: selectedSoilSensor.hardware_id, name: selectedSoilSensor.name } : null}
+        onClose={() => {
+          setOpenSoil(false)
+          setSelectedSoilSensor(null)
+        }}
+      />
       <TemperatureModal
         open={openTemp}
         sensor={selectedSensor}
