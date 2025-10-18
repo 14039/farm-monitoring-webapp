@@ -1,4 +1,4 @@
-import { Modal, Box, Typography, IconButton, Stack, Divider, Chip, LinearProgress } from '@mui/material'
+import { Modal, Box, Typography, IconButton, Stack, Divider, Chip, LinearProgress, Select, MenuItem, FormControl, InputLabel } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import { useEffect, useMemo, useState } from 'react'
 import { ScatterChart, ChartsXAxis, ChartsYAxis, ChartsTooltip, ChartsGrid } from '@mui/x-charts'
@@ -20,20 +20,25 @@ type Reading = {
 type Props = { open: boolean; sensor: SensorRef | null; onClose: () => void }
 
 // NOTE: Backend requires start & end ISO8601 bounds; always include them.
-const FIXED_START_ISO = '2025-09-17T00:53:13Z'
-const FIXED_END_ISO = '2025-09-17T02:38:43Z'
+// Use a rolling last-24-hours window.
 
 export default function SoilSensorModal({ open, sensor, onClose }: Props) {
   const [readings, setReadings] = useState<Reading[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [timeframe, setTimeframe] = useState<'2h' | '1d' | '7d'>('1d')
 
   useEffect(() => {
     let cancelled = false
     if (!open || !sensor) return
     const base = (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
     const urlBase = `${String(base).replace(/\/$/, '')}/api/sensors/${sensor.hardware_id}/readings`
-    const url = `${urlBase}?start=${encodeURIComponent(FIXED_START_ISO)}&end=${encodeURIComponent(FIXED_END_ISO)}`
+    const end = new Date()
+    const windowMs = timeframe === '2h' ? 2 * 60 * 60 * 1000 : timeframe === '7d' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+    const start = new Date(end.getTime() - windowMs)
+    const endIso = end.toISOString()
+    const startIso = start.toISOString()
+    const url = `${urlBase}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`
 
     const load = async () => {
       setLoading(true)
@@ -52,7 +57,7 @@ export default function SoilSensorModal({ open, sensor, onClose }: Props) {
 
     load()
     return () => { cancelled = true }
-  }, [open, sensor?.hardware_id])
+  }, [open, sensor?.hardware_id, timeframe])
 
   // Normalize capacitance (approx 1000..4000) -> 0..1 with clamping
   const soilPoints = useMemo(() => {
@@ -80,8 +85,11 @@ export default function SoilSensorModal({ open, sensor, onClose }: Props) {
     return { min, max, avg, latest }
   }, [soilPoints])
 
-  const xMin = useMemo(() => new Date(FIXED_START_ISO), [])
-  const xMax = useMemo(() => new Date(FIXED_END_ISO), [])
+  const xMax = useMemo(() => new Date(), [open, sensor?.hardware_id, timeframe])
+  const xMin = useMemo(() => {
+    const windowMs = timeframe === '2h' ? 2 * 60 * 60 * 1000 : timeframe === '7d' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000
+    return new Date(xMax.getTime() - windowMs)
+  }, [xMax, timeframe])
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -112,7 +120,7 @@ export default function SoilSensorModal({ open, sensor, onClose }: Props) {
                 second: '2-digit',
                 timeZone: 'UTC',
                 timeZoneName: 'short',
-              }).format(new Date(FIXED_START_ISO))
+              }).format(xMin)
             }  ${
               new Intl.DateTimeFormat(undefined, {
                 weekday: 'short',
@@ -124,9 +132,23 @@ export default function SoilSensorModal({ open, sensor, onClose }: Props) {
                 second: '2-digit',
                 timeZone: 'UTC',
                 timeZoneName: 'short',
-              }).format(new Date(FIXED_END_ISO))
+              }).format(xMax)
             }`}
           />
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id="soil-timeframe-label">Timeframe</InputLabel>
+            <Select
+              labelId="soil-timeframe-label"
+              id="soil-timeframe"
+              label="Timeframe"
+              value={timeframe}
+              onChange={(e) => setTimeframe(e.target.value as '2h' | '1d' | '7d')}
+            >
+              <MenuItem value="2h">Last 2 hours</MenuItem>
+              <MenuItem value="1d">Last 1 day</MenuItem>
+              <MenuItem value="7d">Last 7 days</MenuItem>
+            </Select>
+          </FormControl>
           {metrics && (
             <Stack direction="row" spacing={1} sx={{ ml: 'auto' }}>
               <Chip size="small" color="default" label={`Latest: ${metrics.latest.y.toFixed(3)}`} />
